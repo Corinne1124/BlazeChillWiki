@@ -47,7 +47,7 @@ export const payload: Payload = {
     seo: {
       openGraph: {
         title: '炽冽BlazeChill - 设定，故事与世界观',
-        description: '炽冽BlazeChill - 设定，故事与世界观',
+        description: '炽冽设定集',
         images: [
           {
             url: '/og-image.svg',
