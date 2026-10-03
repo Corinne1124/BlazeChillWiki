@@ -9,8 +9,8 @@ import { Payload } from '@/lib/payload/types';
  */
 export const payload: Payload = {
   global: {
-    title: '忌地之夜 - 设定，故事与世界观',
-    description: '忌夜设定集',
+    title: '炽冽BlazeChill - 设定，故事与世界观',
+    description: '炽冽设定集',
     favicon: '/favicon.svg',
     lang: 'zh-CN',
 
@@ -23,9 +23,9 @@ export const payload: Payload = {
      * engines the real page is somewhere unreachable. A deployment can
      * override it by setting `NEXT_PUBLIC_SITE_URL`.
      */
-    baseUrl: 'https://corinne1124.github.io/avboonight-eziwiki',
+    baseUrl: 'https://corinne1124.github.io/BlazeChillWiki',
     /** Linked from the sidebar. Omit it and the link is not rendered. */
-    repoUrl: 'https://github.com/Corinne1124/avboonight-eziwiki',
+    repoUrl: 'https://github.com/Corinne1124/BlazeChillWiki',
     /**
      * URL form for content pages.
      *
@@ -46,8 +46,8 @@ export const payload: Payload = {
     autoNavigation: true,
     seo: {
       openGraph: {
-        title: '忌夜设定集',
-        description: '忌地之夜世界观 - 角色，故事与设定集',
+        title: '炽冽BlazeChill - 设定，故事与世界观',
+        description: '炽冽BlazeChill - 设定，故事与世界观',
         images: [
           {
             url: '/og-image.svg',
@@ -59,8 +59,8 @@ export const payload: Payload = {
       },
       twitter: {
         card: 'summary_large_image',
-        title: '忌地之夜世界观 - 角色，故事与设定集',
-        description: '忌地之夜世界观 - 角色，故事与设定集',
+        title: '炽冽BlazeChill - 设定，故事与世界观',
+        description: '炽冽BlazeChill - 设定，故事与世界观',
         images: ['/og-image.svg'],
       },
     },
