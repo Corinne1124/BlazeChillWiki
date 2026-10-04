@@ -269,10 +269,8 @@ export interface Strings {
   editorCreate: string;
   /** Label of the path a new page is written to */
   editorPathLabel: string;
-  /** How a path is written */
+  /** How a path is written, and what naming it after a folder does */
   editorPathHint: string;
-  /** Whether the new page is a folder's own page */
-  editorFolderPage: string;
   /** Shown when a page already occupies the path. `{path}` */
   editorPathTaken: string;
   /** Shown when there is nothing to commit */
@@ -437,8 +435,7 @@ const EN: Strings = {
   editorCreate: 'Create page',
   editorPathLabel: 'Path',
   editorPathHint:
-    'Like guides/setup. End it with a slash — ailan/ — for a folder page that can hold sub-pages.',
-  editorFolderPage: 'Folder page (index.md)',
+    'Like guides/setup. Name it after a folder — ailan beside ailan/ — and the page heads that folder’s pages in the sidebar.',
   editorPathTaken: 'A page already exists at {path}.',
   editorNoChanges: 'Nothing has changed yet.',
   editorPathInvalid: 'That path cannot be used as a file name.',
@@ -587,8 +584,7 @@ const KO: Strings = {
   editorCreate: '문서 만들기',
   editorPathLabel: '경로',
   editorPathHint:
-    'guides/setup처럼 입력합니다. 하위 문서를 담을 폴더 페이지라면 ailan/처럼 슬래시로 끝냅니다.',
-  editorFolderPage: '폴더 페이지 (index.md)',
+    'guides/setup처럼 입력합니다. 폴더와 같은 이름으로 지으면(ailan/ 옆의 ailan) 그 문서가 그 폴더의 문서들을 이끕니다.',
   editorPathTaken: '{path}에 이미 문서가 있습니다.',
   editorNoChanges: '아직 바뀐 내용이 없습니다.',
   editorPathInvalid: '그 경로는 파일 이름으로 쓸 수 없습니다.',
@@ -734,8 +730,8 @@ const ZH: Strings = {
   editorSave: '保存',
   editorCreate: '创建页面',
   editorPathLabel: '路径',
-  editorPathHint: '例如 guides/setup；以斜杠结尾（ailan/）表示可挂载子页面的目录页。',
-  editorFolderPage: '目录页（index.md）',
+  editorPathHint:
+    '例如 guides/setup。与某个目录同名时（目录 ailan/ 旁的 ailan），该页面会成为那个目录下页面的父页面。',
   editorPathTaken: '{path} 已有页面存在。',
   editorNoChanges: '还没有任何改动。',
   editorPathInvalid: '该路径不能用作文件名。',

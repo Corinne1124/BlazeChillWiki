@@ -221,56 +221,80 @@ describe('mergeDiscoveredDocs', () => {
     for (const path of nested) expect(topLevel).not.toContain(path);
   });
 
-  it('publishes a folder with index.md as a page holding its siblings', () => {
-    const node = findByPath(mergeDiscoveredDocs([]), 'example/folder-demo');
+  it('heads a folder with the page published beside it', () => {
+    const node = findByPath(mergeDiscoveredDocs([]), 'fixtures');
 
     expect(node).not.toBeNull();
+    // The node is a page now, not a heading…
+    expect(node?.path).toBe('fixtures');
+    expect(node?.name).toBe('夹具父页面');
+
+    // …and it still holds the folder's pages.
     const childPaths = node?.children?.map((child) => child.path) ?? [];
-    expect(childPaths).toContain('example/folder-demo/branch');
-    expect(childPaths).toContain('example/folder-demo/second');
+    expect(childPaths).toContain('fixtures/child');
+    expect(childPaths).toContain('fixtures/second');
     // The page must not also appear among its own children.
-    expect(childPaths).not.toContain('example/folder-demo');
+    expect(childPaths).not.toContain('fixtures');
   });
 
-  it('keeps the folder page once in the tree', () => {
+  it('keeps the heading page once in the tree', () => {
     const paths = extractAllPaths(mergeDiscoveredDocs([]));
 
-    expect(paths.filter((path) => path === 'example/folder-demo')).toHaveLength(1);
+    expect(paths.filter((path) => path === 'fixtures')).toHaveLength(1);
   });
 
-  it('nests folder pages recursively', () => {
-    const node = findByPath(mergeDiscoveredDocs([]), 'example/folder-demo/deeper');
+  it('heads a nested folder with the page beside it too', () => {
+    const node = findByPath(mergeDiscoveredDocs([]), 'fixtures/deep');
 
-    expect(node).not.toBeNull();
-    expect(node?.children?.map((child) => child.path)).toContain('example/folder-demo/deeper/leaf');
+    expect(node?.path).toBe('fixtures/deep');
+    expect(node?.children?.map((child) => child.path)).toContain('fixtures/deep/leaf');
+  });
+
+  it('leaves a folder without a page beside it an unclickable section', () => {
+    const merged = mergeDiscoveredDocs([]);
+    const section = findSectionContaining(merged, 'fixtures/plain/one');
+
+    expect(section).not.toBeNull();
+    expect(section?.path).toBeUndefined();
+    expect(section?.children?.map((child) => child.path)).toContain('fixtures/plain/one');
+  });
+
+  it('treats index.md as an ordinary page inside its folder', () => {
+    const merged = mergeDiscoveredDocs([]);
+    const paths = extractAllPaths(merged);
+
+    // The old convention published `fixtures/plain` for this file; now it is a
+    // page called `fixtures/plain/index`, listed among its siblings.
+    expect(paths).toContain('fixtures/plain/index');
+    expect(findByPath(merged, 'fixtures/plain/index')).not.toBeNull();
   });
 
   it('keeps the folder presentation on the page node', () => {
-    const node = findByPath(mergeDiscoveredDocs([]), 'example/folder-demo');
+    const node = findByPath(mergeDiscoveredDocs([]), 'fixtures');
 
-    // The folder's `_meta.json` hides it from the sidebar...
+    // The folder's `_meta.json` hides the whole subtree from the sidebar, and
+    // gained no name or icon of its own, so the page's title names the node.
     expect(node?.hidden).toBe(true);
-    // ...and the page's own title and icon fill in what the folder does not
-    // declare.
-    expect(node?.name).toBe('文件夹页面演示');
-    expect(node?.icon).toBe('📁');
+    expect(node?.name).toBe('夹具父页面');
   });
 
-  it('keeps a folder holding only index.md an ordinary leaf page', () => {
-    const node = findByPath(mergeDiscoveredDocs([]), 'example/solo-demo');
-
-    expect(node).not.toBeNull();
-    expect(node?.path).toBe('example/solo-demo');
-    expect(node?.children).toBeUndefined();
-    expect(node?.name).toBe('独立目录页示例');
-  });
-
-  it('publishes only the folder page when x.md and x/index.md both exist', () => {
+  it('places a headed folder by the order its own page declares', () => {
     const merged = mergeDiscoveredDocs([]);
-    const node = findByPath(merged, 'example/precedence');
+    const at = merged.findIndex((item) => item.path === 'fixtures');
+    const order = getDoc('fixtures')?.order;
 
-    expect(node).not.toBeNull();
-    expect(node?.name).toBe('目录页优先示例');
-    expect(extractAllPaths(merged).filter((path) => path === 'example/precedence')).toHaveLength(1);
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(order).toBeDefined();
+
+    // `content/fixtures/` has no `_meta.json` order, so the weight of the
+    // folder is the weight of the page heading it: every root page declaring a
+    // smaller one comes first, and every root page declaring a larger one comes
+    // after — a folder does not simply land behind every page or before them.
+    for (const [index, item] of merged.entries()) {
+      const doc = item.path ? getDoc(item.path) : undefined;
+      if (!doc || doc.dir !== '' || item.children === undefined) continue;
+      if (doc.order < order!) expect(index).toBeLessThan(at);
+      if (doc.order > order!) expect(index).toBeGreaterThan(at);
+    }
   });
 });

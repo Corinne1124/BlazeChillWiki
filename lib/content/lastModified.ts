@@ -194,15 +194,9 @@ export function getLastModified(docPath: string): LastModified | null {
   const doc = getDoc(docPath);
   if (!doc) return null;
 
-  // Keyed by the physical file: git names `guides/index.md`, while the page
-  // that file publishes is called `guides`.
-  const fileKey = path
-    .relative(CONTENT_DIR, doc.filePath)
-    .split(path.sep)
-    .join('/')
-    .replace(/\.md$/, '');
-
-  return resolveLastModified(doc.frontmatter.updated, getGitTimes().get(fileKey));
+  // Keyed by content path, which is the file's path: the page `guides/setup`
+  // is `content/guides/setup.md`, and that is the file git dates.
+  return resolveLastModified(doc.frontmatter.updated, getGitTimes().get(docPath));
 }
 
 /**

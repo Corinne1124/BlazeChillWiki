@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   clearRegistryCache,
-  filePathOf,
   getAllDocPaths,
   getContentRegistry,
   getDoc,
@@ -56,16 +55,21 @@ describe('getContentRegistry', () => {
     // author's to decide, and a test that required a particular one failed the
     // day that page was renamed. The invariant is about the shape of a path,
     // not about any page in particular.
-    //
-    // A folder page has no directory either, but its file is `<path>/index.md`,
-    // so it is excluded here — its own case is covered below.
-    const rootDocs = getContentRegistry().docs.filter((doc) => doc.dir === '' && !doc.indexDir);
+    const rootDocs = getContentRegistry().docs.filter((doc) => doc.dir === '');
 
     expect(rootDocs.length).toBeGreaterThan(0);
     for (const doc of rootDocs) {
       expect(doc.path).not.toContain('/');
       expect(doc.segments).toEqual([doc.path]);
-      expect(filePathOf(doc.path)).toBe(`${doc.path}.md`);
+    }
+  });
+
+  it('publishes every page at the path of its file', () => {
+    // The whole convention: nothing is rewritten, so `content/ailan.md` is the
+    // page `ailan` and the folder beside it is organised around that page
+    // rather than owning a page of its own.
+    for (const doc of getContentRegistry().docs) {
+      expect(doc.filePath.replace(/\\/g, '/').endsWith(`/${doc.path}.md`)).toBe(true);
     }
   });
 
@@ -106,55 +110,32 @@ describe('getContentRegistry', () => {
     }
   });
 
-  it('publishes a nested index.md as its folder', () => {
-    const doc = getDoc('example/folder-demo');
+  it('reads a page published beside its folder', () => {
+    // content/fixtures.md and content/fixtures/ — the page is the file, and
+    // the folder is simply where its sub-pages live.
+    const doc = getDoc('fixtures');
 
     expect(doc).toBeDefined();
-    expect(doc?.path).toBe('example/folder-demo');
-    expect(doc?.indexDir).toBe('example/folder-demo');
-    expect(doc?.dir).toBe('example');
-    expect(doc?.title).toBe('文件夹页面演示');
-    expect(doc?.filePath.replace(/\\/g, '/')).toMatch(/folder-demo\/index\.md$/);
+    expect(doc?.dir).toBe('');
+    expect(doc?.title).toBe('夹具父页面');
+    expect(doc?.filePath.replace(/\\/g, '/')).toMatch(/content\/fixtures\.md$/);
   });
 
-  it('nests folder pages as deeply as their directories do', () => {
-    const doc = getDoc('example/folder-demo/deeper');
+  it('reads a heading page nested as deeply as its folder', () => {
+    const doc = getDoc('fixtures/deep');
 
     expect(doc).toBeDefined();
-    expect(doc?.path).toBe('example/folder-demo/deeper');
-    expect(doc?.indexDir).toBe('example/folder-demo/deeper');
-    expect(doc?.filePath.replace(/\\/g, '/')).toMatch(/deeper\/index\.md$/);
+    expect(doc?.dir).toBe('fixtures');
+    expect(doc?.title).toBe('夹具深层父页面');
+    expect(doc?.filePath.replace(/\\/g, '/')).toMatch(/fixtures\/deep\.md$/);
   });
 
-  it('never lists the index filename as a page path', () => {
+  it('treats index.md as an ordinary page', () => {
+    // The old convention made this file stand for its folder. It no longer
+    // does: the page's path is the path of its file, `index` and all.
     const paths = getAllDocPaths();
 
-    expect(paths).toContain('example/folder-demo');
-    expect(paths).not.toContain('example/folder-demo/index');
-  });
-
-  it('resolves the physical file behind a page', () => {
-    // A folder page lives at <folder>/index.md while publishing the folder.
-    expect(filePathOf('example/folder-demo')).toBe('example/folder-demo/index.md');
-    // An ordinary page's physical path is its canonical path plus the suffix.
-    expect(filePathOf('example/intro')).toBe('example/intro.md');
-  });
-
-  it('lets a folder page supersede a plain file sharing its path', () => {
-    const doc = getDoc('example/precedence');
-
-    // content/example/precedence.md and content/example/precedence/index.md
-    // both publish 'example/precedence'; the folder page renders and the old
-    // flat file is not published at all.
-    expect(doc).toBeDefined();
-    expect(doc?.indexDir).toBe('example/precedence');
-    expect(doc?.title).toBe('目录页优先示例');
-    expect(doc?.filePath.replace(/\\/g, '/')).toMatch(/precedence\/index\.md$/);
-
-    const publishing = getContentRegistry().docs.filter(
-      (candidate) => candidate.path === 'example/precedence',
-    );
-    expect(publishing).toHaveLength(1);
-    expect(publishing[0].filePath.replace(/\\/g, '/')).toMatch(/precedence\/index\.md$/);
+    expect(paths).toContain('fixtures/plain/index');
+    expect(getDoc('fixtures/plain/index')?.title).toBe('夹具 index 页面');
   });
 });

@@ -24,7 +24,7 @@ const DEFAULT_DIR_ORDER = Number.MAX_SAFE_INTEGER;
  * Sections and root pages share one list, and both are placed by the `order`
  * they declare: a page's own, or — for a section — the weight of the directory
  * it stands for, which is its folder's `_meta.json` when it has one and the
- * folder page's own `order` when it does not.
+ * `order` declared by the page heading that folder when it does not.
  *
  * Appending instead of placing, which is what the merge used to do, put a
  * section wherever the first document that happened to reference it sorted. A
@@ -204,11 +204,12 @@ function dirToNavItem(dir: string, meta: DirMeta): NavigationItem {
  * section covering its directory, creating that section (and any missing
  * ancestors) when necessary.
  *
- * A directory whose own page is a nested `index.md` stops being a bare section
- * and becomes that page: the node carries the folder's path, opens on a click,
- * and still holds the folder's other pages as its children. A page with
- * sub-pages therefore needs no configuration — write `content/guides/index.md`
- * next to the pages that belong under it.
+ * A directory that has a page of its own beside it stops being a bare section
+ * and becomes that page: `content/ailan.md` heads the pages of
+ * `content/ailan/`, so the node carries the page's path, opens on a click, and
+ * still holds the folder's other pages as its children. A page with sub-pages
+ * therefore needs no configuration — write the page beside the folder it
+ * belongs to, under the folder's name.
  *
  * @param curated - Navigation from the payload config; may be empty
  * @returns The merged navigation tree
@@ -258,42 +259,39 @@ export function mergeDiscoveredDocs(curated: NavigationItem[]): NavigationItem[]
    */
   const sectionDirs = new WeakMap<NavigationItem, string>();
 
-  // Directory → its folder page, for directories that have one. A page that
-  // the curated tree lists, or that hides itself in frontmatter, cannot head
-  // a folder here.
-  const dirIndex = new Map<string, ContentDoc>();
-  for (const doc of docs) {
-    if (!doc.indexDir || doc.hidden || referenced.has(doc.path)) continue;
-    dirIndex.set(doc.indexDir, doc);
-  }
-
   const orphans = docs.filter((doc) => !referenced.has(doc.path) && !doc.hidden);
 
-  // Which directories will actually appear as navigation nodes. Every orphan
-  // contributes its own directory and each ancestor; a folder page is only
-  // attached to a node when that node exists, so a folder holding nothing but
-  // its own page stays an ordinary leaf page instead of vanishing.
+  // Which directories will actually appear as navigation nodes: one does when a
+  // page lives inside it or inside one of its subdirectories. A page never puts
+  // its own name in here — `content/ailan.md` names the directory `ailan`, not
+  // something inside it — which is what keeps a page whose folder holds nothing
+  // (or nothing else) an ordinary leaf rather than an empty heading.
   const nodeDirs = new Set<string>();
   for (const doc of orphans) {
-    if (doc.indexDir) continue; // folder pages ride on the nodes their siblings build
     for (let dir = doc.dir; dir; dir = parentDir(dir)) nodeDirs.add(dir);
   }
-  const hosted = new Set<string>();
+
+  // Directory → the page beside it that heads it: `content/ailan.md` heads the
+  // pages of `content/ailan/`. A page the curated tree lists, or one that hides
+  // itself in frontmatter, is not offered here.
+  const parentPage = new Map<string, ContentDoc>();
   for (const doc of orphans) {
-    if (doc.indexDir && nodeDirs.has(doc.indexDir)) hosted.add(doc.indexDir);
+    if (nodeDirs.has(doc.path) && !parentPage.has(doc.path)) parentPage.set(doc.path, doc);
   }
 
-  const leaves = orphans.filter((doc) => !(doc.indexDir && hosted.has(doc.indexDir)));
+  // A heading page is represented by the node it heads, so it is not appended
+  // among that node's children as well.
+  const leaves = orphans.filter((doc) => !parentPage.has(doc.path));
 
   // A directory's sort weight. Folders without metadata sort after every root
-  // page, as before; a folder page that does not set `_meta.json` order keeps
-  // the `order` its own page declares, so moving `x.md` into `x/index.md`
-  // does not silently reposition the page among its siblings.
+  // page; a folder headed by a page that declares no `_meta.json` order keeps
+  // the `order` that page declares, so writing `content/ailan.md` beside
+  // `content/ailan/` does not reposition anything among its siblings.
   const dirOrder = (dir: string) =>
-    dirMeta.get(dir)?.order ?? dirIndex.get(dir)?.order ?? DEFAULT_DIR_ORDER;
+    dirMeta.get(dir)?.order ?? parentPage.get(dir)?.order ?? DEFAULT_DIR_ORDER;
 
   /**
-   * Turns a directory node into the folder page that heads it, when one exists.
+   * Turns a directory node into the page that heads it, when there is one.
    *
    * Only nodes the auto-merge built itself gain the page's path — a curated
    * section is preserved exactly as written, and listing `path` there is how a
@@ -302,19 +300,19 @@ export function mergeDiscoveredDocs(curated: NavigationItem[]): NavigationItem[]
    */
   function attachFolderPage(node: NavigationItem, dir: string): void {
     if (node.path) return;
-    const index = dirIndex.get(dir);
-    if (!index) return;
+    const page = parentPage.get(dir);
+    if (!page) return;
 
-    node.path = index.path;
+    node.path = page.path;
     // `_meta.json` keeps the last word on how the folder is presented; the
     // page's own title only fills in when the folder names none.
     const meta = dirMeta.get(dir);
-    if (!meta?.name) node.name = index.title;
-    if (!meta?.icon && !node.icon && typeof index.frontmatter.icon === 'string') {
-      node.icon = index.frontmatter.icon;
+    if (!meta?.name) node.name = page.title;
+    if (!meta?.icon && !node.icon && typeof page.frontmatter.icon === 'string') {
+      node.icon = page.frontmatter.icon;
     }
-    if (!meta?.color && !node.color && typeof index.frontmatter.color === 'string') {
-      node.color = index.frontmatter.color;
+    if (!meta?.color && !node.color && typeof page.frontmatter.color === 'string') {
+      node.color = page.frontmatter.color;
     }
   }
 
@@ -396,10 +394,10 @@ export function mergeDiscoveredDocs(curated: NavigationItem[]): NavigationItem[]
     const existing = sections.get(dir);
     if (existing) {
       existing.children ??= [];
-      // A curated section that owns this directory gains the folder page as
+      // A curated section that owns this directory gains the page beside it as
       // its path; its label, colour and ordering stay exactly as written.
-      const index = dirIndex.get(dir);
-      if (index && !existing.path) existing.path = index.path;
+      const page = parentPage.get(dir);
+      if (page && !existing.path) existing.path = page.path;
       return existing.children;
     }
 
@@ -414,11 +412,8 @@ export function mergeDiscoveredDocs(curated: NavigationItem[]): NavigationItem[]
 
   for (const doc of [...leaves].sort((a, b) => compareOrphans(a, b, dirOrder))) {
     const item = docToNavItem(doc);
-    // A `_meta.json` that hides a folder hides the pages it holds even when
-    // the folder is not a section of its own (a directory containing only an
-    // `index.md` page).
-    const physicalDir = doc.indexDir ?? doc.dir;
-    if (dirMeta.get(physicalDir)?.hidden) item.hidden = true;
+    // A `_meta.json` that hides a folder hides the pages it holds.
+    if (dirMeta.get(doc.dir)?.hidden) item.hidden = true;
 
     // Placed rather than appended, so a root page and a top-level section come
     // out in one sequence of `order` values. Appending was what left every

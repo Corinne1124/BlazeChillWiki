@@ -495,13 +495,15 @@ Shiki 内置了一百多种语言的语法定义，全部加载需要约 20 秒�
 
 当你想要手动控制时，添加 `navigation` 数组即可；它不必面面俱到，因为未声明的页面仍会被发现并追加进来。
 
-**文件夹也可以是页面。**在某个文件夹里放一个 `index.md`，该目录就不再只是分区：它作为父页面发布（`content/ailan/index.md` → `/ailan`），目录里的其它 Markdown 文件自动成为它的子页面，侧边栏表现为"可点击父页面 + 展开箭头 + 缩进的子页面"，支持任意层级的嵌套。把现有的 `content/ailan.md` 搬进 `ailan/` 并改名 `index.md`，URL 保持不变，已发布的链接不会断。
+**文件夹也可以是页面。**把一个与目录同名的 `.md` 放在目录旁边，该目录就不再只是分区：这个页面成为父页面，目录里的其它 Markdown 文件自动成为它的子页面，侧边栏表现为"可点击父页面 + 展开箭头 + 缩进的子页面"，支持任意层级的嵌套。页面路径就是文件路径，`content/ailan.md` 发布为 `/ailan`，与它同级的 `ailan/` 里的页面挂在它下面——不需要 `index.md`，也不需要额外配置。
 
 ```
-content/ailan/index.md      → /ailan（父页面）
+content/ailan.md            → /ailan（父页面）
 content/ailan/story.md      → 子页面
 content/ailan/abilities.md  → 子页面
 ```
+
+目录里没有同名页面时，它就是一个不可点击的分区（标题不可点，与从前一样）；`index.md` 也只是一个普通页面，路径为 `.../index`。父页面未设置排序时，它所在目录沿用该页面 frontmatter 里的 `order`，因此把 `ailan.md` 与 `ailan/` 放在一起不会改变它原本在侧边栏中的位置。
 
 ## 命令
 

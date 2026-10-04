@@ -1,6 +1,5 @@
 import { payload } from '@/payload/config';
 import type { GlobalConfig } from '../payload/types';
-import { filePathOf } from './registry';
 
 /** The parts of the site config that decide where an edit link goes. */
 export type EditConfig = Pick<GlobalConfig, 'editUrl' | 'repoUrl' | 'editBranch'>;
@@ -81,15 +80,9 @@ export function buildEditUrl(config: EditConfig, docPath: string): string | null
 /**
  * The edit link for a page under this wiki's own configuration.
  *
- * Named for the physical file, not the canonical path: a folder page lives at
- * `guides/index.md` while publishing the path `guides`, and an edit link built
- * from the canonical path would point at a file that does not exist.
- *
  * @param docPath - Content-relative path without extension
  * @returns Absolute URL, or null when no repository or template is configured
  */
 export function getEditUrl(docPath: string): string | null {
-  const physical = filePathOf(docPath);
-  if (!physical) return null;
-  return buildEditUrl(payload.global, physical.replace(/\.md$/, ''));
+  return buildEditUrl(payload.global, docPath);
 }

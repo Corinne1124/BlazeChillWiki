@@ -13,14 +13,6 @@ import { CONTENT_DIR, cached, contentGeneration, stamp } from '../cache';
 export interface ContentDoc {
   /** Content-relative path without extension (e.g. 'guides/quick-start') */
   path: string;
-  /**
-   * Set when this file is a nested `index.md` — a folder that is itself a
-   * page. Holds the content directory the file heads, which is also its
-   * canonical {@link path}: `guides/index.md` publishes the page `guides`.
-   * Folder pages are what let a page carry sub-pages in the sidebar without
-   * becoming an unclickable section heading.
-   */
-  indexDir?: string;
   /** Path split on '/', useful for grouping by directory */
   segments: string[];
   /** Directory portion of the path, '' for root-level documents */
@@ -272,30 +264,15 @@ function readDoc(filePath: string): ContentDoc | null {
   // the composed form; without this a link typed to such a page resolved on
   // CI and not locally, and the page's URL differed between the two.
   const relative = path.relative(CONTENT_DIR, filePath).replace(/\\/g, '/').normalize('NFC');
-  const relativeNoExt = relative.replace(/\.md$/, '');
-  const rawSegments = relativeNoExt.split('/');
-  const fileName = rawSegments[rawSegments.length - 1];
-  const rawDir = rawSegments.slice(0, -1).join('/');
-
-  // A nested `index.md` is the folder's own page: the folder it lives in is
-  // what it publishes, so its canonical path is the folder rather than
-  // `folder/index`. Root-level `index.md` keeps its ordinary identity — there
-  // is no parent folder for it to stand for.
-  const indexDir = fileName === 'index' && rawDir !== '' ? rawDir : undefined;
-  const docPath = indexDir ?? relativeNoExt;
+  const docPath = relative.replace(/\.md$/, '');
   const segments = docPath.split('/');
+  const fileName = segments[segments.length - 1];
 
   return {
     path: docPath,
-    indexDir,
     segments,
     dir: segments.slice(0, -1).join('/'),
-    title:
-      typeof frontmatter.title === 'string'
-        ? frontmatter.title
-        : indexDir
-          ? titleize(rawDir.slice(rawDir.lastIndexOf('/') + 1))
-          : titleize(fileName),
+    title: typeof frontmatter.title === 'string' ? frontmatter.title : titleize(fileName),
     description: typeof frontmatter.description === 'string' ? frontmatter.description : undefined,
     order: readOrder(frontmatter.order),
     hidden: readBoolean(frontmatter.hidden) || frontmatter.nav === false,
@@ -316,39 +293,6 @@ function readDoc(filePath: string): ContentDoc | null {
 function compareDocs(a: ContentDoc, b: ContentDoc): number {
   if (a.order !== b.order) return a.order - b.order;
   return a.title.localeCompare(b.title);
-}
-
-/**
- * A document's path relative to `content/`, with forward slashes.
- *
- * The canonical {@link ContentDoc.path} can differ from the physical file
- * (a folder page lives at `x/index.md` but publishes the path `x`), and
- * everything that points at the file itself — edit links, commit dates —
- * has to name the real one.
- *
- * @param doc - A document from the registry
- * @returns The content-relative file path, e.g. 'guides/index.md'
- */
-function contentRelative(doc: ContentDoc): string {
-  return path.relative(CONTENT_DIR, doc.filePath).split(path.sep).join('/');
-}
-
-/**
- * The physical file behind a page, as a path relative to `content/`.
- *
- * @param docPath - Canonical content path (e.g. 'guides' or 'guides/setup')
- * @returns The content-relative file path with extension, or null when the
- * path names no document
- *
- * @example
- * ```typescript
- * filePathOf('guides/setup'); // 'guides/setup.md'
- * filePathOf('guides');       // 'guides/index.md' when that file exists
- * ```
- */
-export function filePathOf(docPath: string): string | null {
-  const doc = getContentRegistry().byPath.get(docPath);
-  return doc ? contentRelative(doc) : null;
 }
 
 /**
@@ -394,29 +338,15 @@ export function getContentRegistry(): ContentRegistry {
     .filter((doc): doc is ContentDoc => doc !== null)
     .sort(compareDocs);
 
-  // Two files can publish the same page: `x.md` and `x/index.md` both claim
-  // the path `x`. The folder page wins — writing `x/index.md` is how a page
-  // grows sub-pages, and the plain file it supersedes simply stops being
-  // published. That tolerates the in-between moment of a move, when the old
-  // file is still sitting next to the folder that replaced it.
-  const byPath = new Map<string, ContentDoc>();
-  for (const doc of docs) {
-    const existing = byPath.get(doc.path);
-    if (!existing || (doc.indexDir && !existing.indexDir)) {
-      byPath.set(doc.path, doc);
-    }
-  }
-
-  // Every consumer — navigation, URLs, search, the build list — reads the
-  // documents array, so a superseded file has to leave it entirely rather
-  // than merely losing a place in the map.
-  const published = docs.filter((doc) => byPath.get(doc.path) === doc);
+  // A document's path is its file's path, so two files cannot claim one page
+  // and no page can be superseded by another.
+  const byPath = new Map<string, ContentDoc>(docs.map((doc) => [doc.path, doc]));
 
   // Collect metadata for every directory that actually contains documents.
   const dirMeta = new Map<string, DirMeta>();
   const dirs = new Set<string>();
 
-  for (const doc of published) {
+  for (const doc of docs) {
     // Register the document's directory and each of its ancestors, so that a
     // nested section such as 'api/v2' contributes both 'api' and 'api/v2'.
     for (let i = 1; i < doc.segments.length; i++) {
@@ -428,15 +358,7 @@ export function getContentRegistry(): ContentRegistry {
     dirMeta.set(dir, readDirMeta(path.join(CONTENT_DIR, dir)));
   }
 
-  // A nested `index.md` needs its own directory registered too, or its
-  // `_meta.json` would be ignored whenever the folder holds nothing else.
-  for (const doc of published) {
-    if (doc.indexDir && !dirs.has(doc.indexDir)) {
-      dirMeta.set(doc.indexDir, readDirMeta(path.join(CONTENT_DIR, doc.indexDir)));
-    }
-  }
-
-  memo = { docs: published, byPath, dirMeta };
+  memo = { docs, byPath, dirMeta };
 
   memoStamp.at = contentGeneration();
   return memo;

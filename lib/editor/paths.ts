@@ -3,26 +3,19 @@
  *
  * The editor writes files into a repository rather than into a directory it can
  * list, so a path typed by a reader has to be checked here — before it becomes
- * a commit — and turned into the file that would hold it. A path that names a
- * folder (`ailan/`) becomes that folder's `index.md`, which is the same
- * convention the navigation uses to publish a page that can hold sub-pages.
+ * a commit — and turned into the file that would hold it. A page's path is the
+ * path of its file: `content/ailan.md` publishes `ailan`, and because that is
+ * also the name of the folder beside it, the page heads that folder's pages in
+ * the sidebar. Nothing about the file has to say so.
  *
  * Pure and client-safe: no filesystem, no registry.
  */
 
-/** A page the editor can act on. */
-export interface PageTarget {
-  /** Canonical content path, e.g. 'guides/setup' */
-  path: string;
-  /** True when the page is a folder's own page, held in `<path>/index.md` */
-  folderPage: boolean;
-}
-
 /** Why a typed path cannot be used. */
 export type PathProblem = 'empty' | 'reserved' | 'draft' | 'invalid';
 
-/** Either a usable target or the reason it is not one. */
-export type PathCheck = { ok: true; target: PageTarget } | { ok: false; problem: PathProblem };
+/** Either a usable path or the reason it is not one. */
+export type PathCheck = { ok: true; path: string } | { ok: false; problem: PathProblem };
 
 /**
  * First URL segments the app keeps for its own views.
@@ -70,33 +63,26 @@ export function suggestPagePath(target: string): string {
 }
 
 /**
- * Checks a path typed into the editor and turns it into a page target.
+ * Checks a path typed into the editor.
  *
- * A trailing slash asks for a folder page (`ailan/` → `ailan/index.md`), and so
- * does an explicit `.../index`. Leading and trailing slashes and a `.md` suffix
- * are tolerated, since all three are how people write a path.
+ * Leading and trailing slashes and a `.md` suffix are tolerated, since all
+ * three are how people write a path. A trailing slash carries no meaning of its
+ * own: `ailan/` is the page `ailan`, whose file sits beside the folder of that
+ * name.
  *
  * @param input - Path as typed
- * @returns The target, or the reason it was refused
+ * @returns The path to publish, or the reason it was refused
  *
  * @example
  * ```typescript
- * checkPagePath('guides/setup'); // { ok: true, target: { path: 'guides/setup', folderPage: false } }
- * checkPagePath('ailan/');       // { ok: true, target: { path: 'ailan', folderPage: true } }
+ * checkPagePath('guides/setup'); // { ok: true, path: 'guides/setup' }
+ * checkPagePath('ailan/');       // { ok: true, path: 'ailan' }
  * checkPagePath('/graph/');      // { ok: false, problem: 'reserved' }
  * ```
  */
 export function checkPagePath(input: string): PathCheck {
   const trimmed = input.trim().replace(/^\/+|\/+$/g, '');
-
-  // A folder page is asked for by a trailing slash (`ailan/`) or by naming the
-  // file that holds it (`ailan/index`). Alone, `index` is just a page called
-  // index — there is no folder for it to stand for.
-  const explicitIndex = /(^|\/)index(\.md)?$/i.test(trimmed) && trimmed.includes('/');
-  const wantsFolder = /\/$/.test(input.trim()) || explicitIndex;
-
-  const withoutIndex = explicitIndex ? trimmed.replace(/\/index(\.md)?$/i, '') : trimmed;
-  const withoutExt = withoutIndex.replace(/\.md$/i, '');
+  const withoutExt = trimmed.replace(/\.md$/i, '');
   const normalized = withoutExt
     .split('/')
     .map((segment) => segment.trim())
@@ -122,51 +108,18 @@ export function checkPagePath(input: string): PathCheck {
     return { ok: false, problem: 'reserved' };
   }
 
-  return { ok: true, target: { path: segments.join('/'), folderPage: wantsFolder } };
+  return { ok: true, path: segments.join('/') };
 }
 
 /**
  * The repository file a page lives in.
  *
- * @param target - Page target
- * @returns Path from the repository root, e.g. 'content/ailan/index.md'
+ * A page's path is its file's path, so this is a suffix rather than a lookup:
+ * `guides/setup` is `content/guides/setup.md`, always.
+ *
+ * @param pagePath - Content path, as {@link checkPagePath} returned it
+ * @returns Path from the repository root
  */
-export function filePathFor(target: PageTarget): string {
-  return target.folderPage ? `content/${target.path}/index.md` : `content/${target.path}.md`;
-}
-
-/**
- * The files a page could live in, most likely first.
- *
- * A reader arriving with a URL knows the page's canonical path but not which of
- * the two conventions the file follows — nothing in the URL says whether
- * `ailan` is `ailan.md` or `ailan/index.md`. Reading the plain file first and
- * the folder page second costs one extra request only for folder pages, and
- * avoids sending a map of every document to the browser for the sake of this
- * one lookup.
- *
- * @param pagePath - Canonical content path
- * @returns Candidate repository paths, in the order they should be tried
- */
-export function candidateFilesFor(pagePath: string): string[] {
-  const trimmed = pagePath.replace(/^\/+|\/+$/g, '');
-  if (!trimmed) return [];
-
-  return [`content/${trimmed}.md`, `content/${trimmed}/index.md`];
-}
-
-/**
- * The canonical path a repository file publishes.
- *
- * The inverse of {@link filePathFor}, used when a commit's path has to be
- * checked against the page the editor believes it is editing.
- *
- * @param file - Path from the repository root, e.g. 'content/ailan/index.md'
- * @returns The content path, or null when the file is not under `content/`
- */
-export function pagePathForFile(file: string): string | null {
-  const match = /^content\/(.+)\.md$/i.exec(file.replace(/^\/+/, ''));
-  if (!match) return null;
-
-  return match[1].replace(/\/index$/i, '');
+export function filePathFor(pagePath: string): string {
+  return `content/${pagePath.replace(/^\/+|\/+$/g, '')}.md`;
 }

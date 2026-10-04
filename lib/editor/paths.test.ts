@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  RESERVED_SEGMENTS,
-  candidateFilesFor,
-  checkPagePath,
-  filePathFor,
-  pagePathForFile,
-  suggestPagePath,
-} from './paths';
+import { RESERVED_SEGMENTS, checkPagePath, filePathFor, suggestPagePath } from './paths';
 import { RESERVED_SEGMENTS as ROUTE_SEGMENTS } from '../navigation/routes';
 
 describe('suggestPagePath', () => {
@@ -23,51 +16,26 @@ describe('suggestPagePath', () => {
 
 describe('checkPagePath', () => {
   it('accepts an ordinary page path', () => {
-    expect(checkPagePath('guides/setup')).toEqual({
-      ok: true,
-      target: { path: 'guides/setup', folderPage: false },
-    });
+    expect(checkPagePath('guides/setup')).toEqual({ ok: true, path: 'guides/setup' });
   });
 
   it('tolerates the punctuation people type around a path', () => {
-    expect(checkPagePath('/guides/setup.md/')).toEqual({
-      ok: true,
-      target: { path: 'guides/setup', folderPage: true },
-    });
+    expect(checkPagePath('/guides/setup.md/')).toEqual({ ok: true, path: 'guides/setup' });
   });
 
-  it('reads a trailing slash as a folder page', () => {
-    expect(checkPagePath('ailan/')).toEqual({
-      ok: true,
-      target: { path: 'ailan', folderPage: true },
-    });
+  it('reads a trailing slash as the same path', () => {
+    // A folder is named by the page beside it, not by the slash: `ailan/` is
+    // the page `ailan`.
+    expect(checkPagePath('ailan/')).toEqual({ ok: true, path: 'ailan' });
   });
 
-  it('reads a named index as a folder page', () => {
-    expect(checkPagePath('ailan/index')).toEqual({
-      ok: true,
-      target: { path: 'ailan', folderPage: true },
-    });
-    expect(checkPagePath('ailan/index.md')).toEqual({
-      ok: true,
-      target: { path: 'ailan', folderPage: true },
-    });
-  });
-
-  it('treats a root-level index as a page of its own', () => {
-    // There is no folder for it to stand for, and `content/index.md` is an
-    // ordinary page at /index.
-    expect(checkPagePath('index')).toEqual({
-      ok: true,
-      target: { path: 'index', folderPage: false },
-    });
+  it('keeps index as part of a path', () => {
+    expect(checkPagePath('ailan/index')).toEqual({ ok: true, path: 'ailan/index' });
+    expect(checkPagePath('index')).toEqual({ ok: true, path: 'index' });
   });
 
   it('keeps spaces, which the content already carries', () => {
-    expect(checkPagePath('AE - ASKARSE')).toEqual({
-      ok: true,
-      target: { path: 'AE - ASKARSE', folderPage: false },
-    });
+    expect(checkPagePath('AE - ASKARSE')).toEqual({ ok: true, path: 'AE - ASKARSE' });
   });
 
   it('refuses an empty path', () => {
@@ -102,21 +70,10 @@ describe('checkPagePath', () => {
 
 describe('file paths', () => {
   it('maps a page to the file that holds it', () => {
-    expect(filePathFor({ path: 'guides/setup', folderPage: false })).toBe(
-      'content/guides/setup.md',
-    );
-    expect(filePathFor({ path: 'ailan', folderPage: true })).toBe('content/ailan/index.md');
-  });
-
-  it('offers both conventions when only the canonical path is known', () => {
-    expect(candidateFilesFor('ailan')).toEqual(['content/ailan.md', 'content/ailan/index.md']);
-    expect(candidateFilesFor('/ailan/')).toEqual(['content/ailan.md', 'content/ailan/index.md']);
-    expect(candidateFilesFor('')).toEqual([]);
-  });
-
-  it('reads a canonical path back out of a file path', () => {
-    expect(pagePathForFile('content/ailan/index.md')).toBe('ailan');
-    expect(pagePathForFile('content/guides/setup.md')).toBe('guides/setup');
-    expect(pagePathForFile('public/images/a.png')).toBeNull();
+    expect(filePathFor('guides/setup')).toBe('content/guides/setup.md');
+    // Even a page that heads a folder is an ordinary file: the folder is a
+    // neighbour, not a container it lives in.
+    expect(filePathFor('ailan')).toBe('content/ailan.md');
+    expect(filePathFor('/ailan/')).toBe('content/ailan.md');
   });
 });

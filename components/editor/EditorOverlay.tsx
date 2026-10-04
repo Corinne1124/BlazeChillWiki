@@ -7,13 +7,7 @@ import { useStrings } from '@/components/providers/StringsProvider';
 import { useEditorConfig } from '@/components/providers/EditorConfigProvider';
 import { useEditorStore } from '@/lib/store/editorStore';
 import { format } from '@/lib/i18n/format';
-import {
-  candidateFilesFor,
-  checkPagePath,
-  filePathFor,
-  suggestPagePath,
-  type PathProblem,
-} from '@/lib/editor/paths';
+import { checkPagePath, filePathFor, suggestPagePath, type PathProblem } from '@/lib/editor/paths';
 import {
   getField,
   parseDocument,
@@ -120,7 +114,6 @@ export function EditorOverlay() {
   const [tab, setTab] = useState<'fields' | 'source'>('fields');
   const [message, setMessage] = useState('');
   const [newPath, setNewPath] = useState('');
-  const [newFolderPage, setNewFolderPage] = useState(false);
   const [movePath, setMovePath] = useState('');
   const [deleteArmed, setDeleteArmed] = useState(false);
 
@@ -256,7 +249,6 @@ export function EditorOverlay() {
       setTab('fields');
       setMessage('');
       setNewPath('');
-      setNewFolderPage(false);
       setPhase('ready');
     };
 
@@ -309,20 +301,18 @@ export function EditorOverlay() {
       if (mode === 'new') {
         const title = asText(getField(doc, 'title'));
         const typed = newPath.trim();
-        const folder =
-          newFolderPage && typed && !/\/$/.test(typed) && !/\/index(\.md)?$/i.test(typed);
-        const check = checkPagePath(folder ? `${typed}/` : typed || suggestPagePath(title));
+        const check = checkPagePath(typed || suggestPagePath(title));
 
         if (!check.ok) {
           setFailure({ text: pathProblem(check.problem) });
           return;
         }
 
-        const target = filePathFor(check.target);
+        const target = filePathFor(check.path);
         const existing = await readFile(storedToken, repo, target);
 
         if (existing) {
-          setFailure({ text: format(t.editorPathTaken, { path: check.target.path }) });
+          setFailure({ text: format(t.editorPathTaken, { path: check.path }) });
           return;
         }
 
@@ -331,11 +321,11 @@ export function EditorOverlay() {
           repo,
           target,
           currentText,
-          format(t.editorMessageCreate, { path: check.target.path }),
+          format(t.editorMessageCreate, { path: check.path }),
         );
 
         setNotice({
-          text: format(t.editorCommitted, { path: check.target.path }),
+          text: format(t.editorCommitted, { path: check.path }),
           url: result.commitUrl,
         });
         return;
@@ -385,7 +375,7 @@ export function EditorOverlay() {
         return;
       }
 
-      const target = filePathFor(check.target);
+      const target = filePathFor(check.path);
 
       if (target === file.file) {
         setFailure({ text: t.editorNoChanges });
@@ -395,7 +385,7 @@ export function EditorOverlay() {
       const existing = await readFile(storedToken, repo, target);
 
       if (existing) {
-        setFailure({ text: format(t.editorPathTaken, { path: check.target.path }) });
+        setFailure({ text: format(t.editorPathTaken, { path: check.path }) });
         return;
       }
 
@@ -412,7 +402,7 @@ export function EditorOverlay() {
         repo,
         target,
         moved,
-        format(t.editorMessageMove, { from: targetPath, to: check.target.path }),
+        format(t.editorMessageMove, { from: targetPath, to: check.path }),
       );
 
       await deleteFile(
@@ -424,9 +414,9 @@ export function EditorOverlay() {
       );
 
       setFile({ file: target, sha: created.sha ?? '', content: moved });
-      setMovePath(check.target.path);
+      setMovePath(check.path);
       setNotice({
-        text: format(t.editorCommitted, { path: check.target.path }),
+        text: format(t.editorCommitted, { path: check.path }),
         url: created.commitUrl,
       });
     } catch (error) {
@@ -615,7 +605,7 @@ export function EditorOverlay() {
               {canWrite && (
                 <>
                   {mode === 'new' && (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3">
                       <label className="block">
                         <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
                           {t.editorPathLabel}
@@ -627,18 +617,7 @@ export function EditorOverlay() {
                           className={`${INPUT_CLASS} font-mono`}
                         />
                       </label>
-                      <label className="flex items-end gap-2 pb-1 text-sm text-gray-700 dark:text-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={newFolderPage}
-                          onChange={(event) => setNewFolderPage(event.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
-                        />
-                        {t.editorFolderPage}
-                      </label>
-                      <p className="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">
-                        {t.editorPathHint}
-                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{t.editorPathHint}</p>
                     </div>
                   )}
 
@@ -862,17 +841,12 @@ function FailureMessage({ failure }: { failure: Failure }) {
 }
 
 /**
- * Finds the file a page lives in.
+ * Reads the file a page lives in.
  *
- * Both conventions are tried, because the canonical path does not say which one
- * the file follows: `ailan` is `ailan.md` or `ailan/index.md`, and only reading
- * the repository settles it.
+ * One request, because a page's path is its file's path: `ailan` is
+ * `content/ailan.md` and nothing else, whether or not a folder of that name
+ * sits beside it.
  */
 async function locate(token: string, repo: RepoRef, pagePath: string): Promise<RemoteFile | null> {
-  for (const candidate of candidateFilesFor(pagePath)) {
-    const found = await readFile(token, repo, candidate);
-    if (found) return found;
-  }
-
-  return null;
+  return readFile(token, repo, filePathFor(pagePath));
 }

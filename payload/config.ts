@@ -53,7 +53,7 @@ export const payload: Payload = {
             url: '/og-image.svg',
             width: 1200,
             height: 630,
-            alt: '忌夜！',
+            alt: '晨昏线',
           },
         ],
       },
